@@ -101,6 +101,8 @@ Check if a given agent is installed
 forge <agent> check
 ```
 
+> **Want to add a new agent?** See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-new-agent) for instructions on adding agents to Forge.
+
 ## Usage
 
 ### TUI mode
