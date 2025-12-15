@@ -21,12 +21,6 @@ export const ListCommand = cmd({
     for (const agent of agents) {
       process.stdout.write(agent.name)
       process.stdout.write(EOL)
-    } else {
-      // Simple list mode (original behavior)
-      for (const agent of agents) {
-        process.stdout.write(agent.name)
-        process.stdout.write(EOL)
-      }
     }
   },
 })
