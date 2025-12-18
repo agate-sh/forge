@@ -306,10 +306,50 @@ export namespace ACPOrchestrator {
       throw new Error("Cannot create client without an agent")
     }
 
+    // Build environment variables for the subprocess
+    const env: Record<string, string> = {}
+
+    // Add OpenTelemetry telemetry configuration for Claude Code
+    if (agent.name === "Claude Code") {
+      // Get OTEL endpoint from environment or default to localhost:4317
+      const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4317"
+
+      env.CLAUDE_CODE_ENABLE_TELEMETRY = "1"
+      env.OTEL_METRICS_EXPORTER = "otlp"
+      env.OTEL_LOGS_EXPORTER = "otlp"
+      env.OTEL_EXPORTER_OTLP_PROTOCOL = "grpc"
+      env.OTEL_EXPORTER_OTLP_ENDPOINT = otelEndpoint
+
+      // Allow override of protocol via environment variable
+      if (process.env.OTEL_EXPORTER_OTLP_PROTOCOL) {
+        env.OTEL_EXPORTER_OTLP_PROTOCOL = process.env.OTEL_EXPORTER_OTLP_PROTOCOL
+      }
+
+      // Allow override of metrics/logs exporters via environment variables
+      if (process.env.OTEL_METRICS_EXPORTER) {
+        env.OTEL_METRICS_EXPORTER = process.env.OTEL_METRICS_EXPORTER
+      }
+      if (process.env.OTEL_LOGS_EXPORTER) {
+        env.OTEL_LOGS_EXPORTER = process.env.OTEL_LOGS_EXPORTER
+      }
+
+      // Pass through any OTEL headers if configured
+      if (process.env.OTEL_EXPORTER_OTLP_HEADERS) {
+        env.OTEL_EXPORTER_OTLP_HEADERS = process.env.OTEL_EXPORTER_OTLP_HEADERS
+      }
+
+      log.info("enabling telemetry for Claude Code", {
+        sessionID,
+        endpoint: otelEndpoint,
+        protocol: env.OTEL_EXPORTER_OTLP_PROTOCOL,
+      })
+    }
+
     const client = await ACPClient.create({
       command: agent.command,
       args: agent.acpStartupArgs,
       cwd: Instance.directory,
+      env,
       capabilities: {
         fs: {
           readTextFile: false,
