@@ -29,7 +29,7 @@ import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
-import { matchAgent, getAllAgents } from "@/acp/agents"
+import { matchAgentAsync, getAllAgentsAsync, preloadAgents } from "@/acp/agents"
 import { matchModel } from "@/acp/util"
 import { findModeId, type AgentFlag } from "../session-init"
 import open from "open"
@@ -169,6 +169,9 @@ function App() {
   const args = useArgs()
   const initialAgent = () => (args.agents && args.agents.length > 0 ? (args.agents[0] as AgentFlag) : undefined)
   onMount(async () => {
+    // Preload agents from registry
+    await preloadAgents()
+
     // Handle agent selection - only set if explicitly provided via args or already stored
     const targetAgent = initialAgent()?.name
     const targetModel = initialAgent()?.model
@@ -177,7 +180,7 @@ function App() {
     let agentToUse: string | null = null
 
     if (targetAgent) {
-      const agentResult = matchAgent(targetAgent)
+      const agentResult = await matchAgentAsync(targetAgent)
       if (!agentResult.success) {
         if (agentResult.error === "ambiguous") {
           const matchNames = agentResult.matches.map((a) => a.name).join(", ")
@@ -187,7 +190,7 @@ function App() {
             duration: 5000,
           })
         } else {
-          const available = getAllAgents()
+          const available = (await getAllAgentsAsync())
             .map((a) => a.name)
             .join(", ")
           toast.show({
@@ -285,9 +288,9 @@ function App() {
     }
 
     if (args.installAgent) {
-      const agentResult = matchAgent(args.installAgent)
+      const agentResult = await matchAgentAsync(args.installAgent)
       if (!agentResult.success) {
-        const available = getAllAgents()
+        const available = (await getAllAgentsAsync())
           .map((a) => a.name)
           .join(", ")
         toast.show({

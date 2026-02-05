@@ -168,6 +168,11 @@ import type {
   TuiControlResponseResponses,
   WorkspaceListData,
   WorkspaceListResponses,
+  WorkspaceCreateData,
+  WorkspaceCreateResponses,
+  WorkspaceCreateErrors,
+  WorkspaceSuggestNameData,
+  WorkspaceSuggestNameResponses,
   WorkspaceGetData,
   WorkspaceGetResponses,
   WorkspaceGetErrors,
@@ -987,6 +992,30 @@ class Workspace extends _HeyApiClient {
   public list<ThrowOnError extends boolean = false>(options: Options<WorkspaceListData, ThrowOnError>) {
     return (options.client ?? this._client).get<WorkspaceListResponses, unknown, ThrowOnError>({
       url: "/workspace",
+      ...options,
+    })
+  }
+
+  /**
+   * Create a new workspace
+   */
+  public create<ThrowOnError extends boolean = false>(options?: Options<WorkspaceCreateData, ThrowOnError>) {
+    return (options?.client ?? this._client).post<WorkspaceCreateResponses, WorkspaceCreateErrors, ThrowOnError>({
+      url: "/workspace",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    })
+  }
+
+  /**
+   * Suggest a random workspace name
+   */
+  public suggestName<ThrowOnError extends boolean = false>(options?: Options<WorkspaceSuggestNameData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<WorkspaceSuggestNameResponses, unknown, ThrowOnError>({
+      url: "/workspace/suggest-name",
       ...options,
     })
   }

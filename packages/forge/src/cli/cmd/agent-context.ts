@@ -4,9 +4,11 @@ import { UI } from "../ui"
 import { EOL } from "os"
 import {
   matchAgent,
-  getAllAgents,
+  matchAgentAsync,
+  getAllAgentsAsync,
   getInstallCommandsForPlatform,
   getUninstallCommandsForPlatform,
+  preloadAgents,
   type ACPAgentDefinition,
 } from "@/acp/agents"
 import { ACPClient } from "@/acp/client"
@@ -45,6 +47,8 @@ export const AgentManageCommand = cmd({
       })
   },
   handler: async (args) => {
+    // Preload agents from registry before matching
+    await preloadAgents()
     await runAgentManage(
       args.agent as string | undefined,
       args.subcommand as string | undefined,
@@ -151,6 +155,8 @@ export const AgentRunCommand = cmd({
       process.exit(1)
     }
 
+    // Preload agents from registry before matching
+    await preloadAgents()
     const agentMatch = matchAgent(agentName)
 
     if (!agentMatch.success) {
@@ -286,6 +292,8 @@ export async function runAgentManage(agentName: string | undefined, subcommand: 
     process.exit(1)
   }
 
+  // Ensure agents are loaded before matching
+  await preloadAgents()
   const agentMatch = matchAgent(agentName)
 
   if (!agentMatch.success) {

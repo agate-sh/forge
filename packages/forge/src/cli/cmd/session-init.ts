@@ -1,6 +1,6 @@
 import type { SessionModelState, SessionModeState } from "@agentclientprotocol/sdk"
 import type { ForgeClient } from "@forge/sdk"
-import { matchAgent, getAllAgents } from "@/acp/agents"
+import { matchAgent, getAllAgents, matchAgentAsync, getAllAgentsAsync } from "@/acp/agents"
 import { Log } from "@/util/log"
 
 export type AgentFlag = {
@@ -171,10 +171,10 @@ export function validateAgentFlags(agents: AgentFlag[], rawCount: number, fail: 
   if (missingName) fail("Agent name is required")
 }
 
-function resolveAgentName(name: string) {
-  const match = matchAgent(name)
+async function resolveAgentName(name: string) {
+  const match = await matchAgentAsync(name)
   if (!match.success) {
-    const available = getAllAgents()
+    const available = (await getAllAgentsAsync())
       .map((a) => a.name)
       .join(", ")
     throw new Error(`Agent '${name}' not found. Available: ${available}`)
@@ -199,7 +199,7 @@ export async function applyAgentEntry(options: {
   log?: ReturnType<typeof Log.create>
 }): Promise<ResolvedAgent> {
   const log = options.log ?? Log.create({ service: "session-agent" })
-  const agentName = resolveAgentName(options.entry.name)
+  const agentName = await resolveAgentName(options.entry.name)
 
   log.info("agent.apply", {
     sessionID: options.sessionID,

@@ -1,6 +1,6 @@
 import type { Argv } from "yargs"
 import { cmd } from "./cmd"
-import { getAllAgents } from "../../acp/agents"
+import { getAllAgentsAsync } from "../../acp/agents"
 import { EOL } from "os"
 
 export const ListCommand = cmd({
@@ -10,7 +10,7 @@ export const ListCommand = cmd({
     return yargs
   },
   handler: async (argv) => {
-    const agents = getAllAgents()
+    const agents = await getAllAgentsAsync()
 
     // List all agents
     for (const agent of agents) {

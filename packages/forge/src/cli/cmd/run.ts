@@ -11,7 +11,7 @@ import { createForgeClient } from "@forge/sdk"
 import { Server } from "../../server/server"
 import { type AgentFlag, applyAgentEntry, parseAgentFlags, validateAgentFlags } from "./session-init"
 import { Log } from "@/util/log"
-import { getAgent } from "@/acp/agents"
+import { getAgentAsync } from "@/acp/agents"
 
 const TOOL: Record<string, [string, string]> = {
   todowrite: ["Todo", UI.Style.TEXT_WARNING_BOLD],
@@ -239,10 +239,10 @@ export async function runNonInteractive(args: RunHandlerArgs) {
         await applyQueueEntry(0, "initial")
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        const agentGuide = getAgent(queueState.entries[0]?.name)?.installGuide
+        const agentDef = await getAgentAsync(queueState.entries[0]?.name)
         const hint =
-          agentGuide && /not installed|command not found/i.test(message)
-            ? `${message}\nInstall: ${agentGuide}`
+          agentDef?.installGuide && /not installed|command not found/i.test(message)
+            ? `${message}\nInstall: ${agentDef.installGuide}`
             : message
         UI.error(hint)
         process.exit(1)
@@ -269,9 +269,9 @@ export async function runNonInteractive(args: RunHandlerArgs) {
               await applyQueueEntry(queueState.index + 1, "switch")
             } catch (error) {
               const base = error instanceof Error ? error.message : String(error)
-              const agentGuide = getAgent(queueState.entries[queueState.index + 1]?.name)?.installGuide
+              const agentDef = await getAgentAsync(queueState.entries[queueState.index + 1]?.name)
               const message =
-                agentGuide && /not installed|command not found/i.test(base) ? `${base}\nInstall: ${agentGuide}` : base
+                agentDef?.installGuide && /not installed|command not found/i.test(base) ? `${base}\nInstall: ${agentDef.installGuide}` : base
               const wrapped = `Failed to switch agent queue: ${message}`
               UI.error(wrapped)
               errorMsg = errorMsg ? `${errorMsg}${EOL}${wrapped}` : wrapped

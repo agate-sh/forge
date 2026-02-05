@@ -21,7 +21,7 @@ export function createForgeClient(config?: Config & { directory?: string }) {
   if (config?.directory) {
     config.headers = {
       ...config.headers,
-      "x-opencode-directory": config.directory,
+      "x-forge-directory": config.directory,
     }
   }
 

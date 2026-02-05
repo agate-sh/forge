@@ -1,0 +1,113 @@
+{
+  "name": "forge-vscode",
+  "displayName": "Forge",
+  "description": "Forge: Universal CLI for ACP Agents",
+  "version": "0.0.1",
+  "publisher": "forge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/forge"
+  },
+  "license": "MIT",
+  "icon": "images/forge-icon.png",
+  "galleryBanner": {
+    "color": "#000000",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "forge",
+          "title": "Forge",
+          "icon": "images/forge-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "forge": [
+        {
+          "id": "forgeWorkspaces",
+          "name": "Workspaces"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "forge.openSession",
+        "title": "Open Session",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "forge.createNewSession",
+        "title": "New Session",
+        "icon": "$(add)"
+      },
+      {
+        "command": "forge.addWorkspace",
+        "title": "Add Workspace",
+        "icon": "$(add)"
+      },
+      {
+        "command": "forge.deleteSession",
+        "title": "Delete Session",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "forge.addWorkspace",
+          "when": "view == forgeWorkspaces",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "forge.createNewSession",
+          "when": "view == forgeWorkspaces && viewItem == workspace",
+          "group": "inline"
+        },
+        {
+          "command": "forge.deleteSession",
+          "when": "view == forgeWorkspaces && viewItem == session",
+          "group": "inline"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "forge.createNewSession",
+        "key": "cmd+shift+escape",
+        "mac": "cmd+shift+escape",
+        "win": "ctrl+shift+escape",
+        "linux": "ctrl+shift+escape"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run package",
+    "compile": "bun run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "bun run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "build": "node esbuild.js"
+  },
+  "dependencies": {
+    "@forge/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.94.0",
+    "@types/node": "22.x",
+    "esbuild": "^0.25.3",
+    "typescript": "^5.8.3"
+  }
+}

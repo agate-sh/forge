@@ -9,7 +9,7 @@ import { AuthenticationRequiredError } from "./types"
 import { Permission } from "../permission"
 import type { SessionModelState, SessionModeState } from "@agentclientprotocol/sdk"
 import type { ACPAgentDefinition } from "./agents"
-import { DEFAULT_AGENT, getAgent, matchAgent } from "./agents"
+import { matchAgentAsync } from "./agents"
 import { Bus } from "../bus"
 import { SessionMode } from "../session/mode"
 import { TuiEvent } from "../cli/cmd/tui/event"
@@ -197,7 +197,7 @@ export namespace ACPOrchestrator {
    * Change the ACP agent for a session, recreating the client.
    */
   export async function setAgent(sessionID: string, agentName: string): Promise<SessionState> {
-    const matchResult = matchAgent(agentName)
+    const matchResult = await matchAgentAsync(agentName)
     if (!matchResult.success) {
       if (matchResult.error === "ambiguous") {
         const matches = matchResult.matches.map((a) => a.name).join(", ")

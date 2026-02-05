@@ -18,7 +18,8 @@
       "packages/forge",
       "packages/sdk/js",
       "packages/util",
-      "packages/script"
+      "packages/script",
+      "packages/vscode-extension"
     ],
     "catalog": {
       "@types/bun": "1.3.3",

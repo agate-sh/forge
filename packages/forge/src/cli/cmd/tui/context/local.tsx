@@ -1,17 +1,14 @@
 import { createStore } from "solid-js/store"
-import { batch, createEffect, createMemo } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, onMount } from "solid-js"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
-import { uniqueBy } from "remeda"
-import path from "path"
-import { Global } from "@/global"
 import { iife } from "@/util/iife"
 import { createSimpleContext } from "./helper"
 import { useToast } from "../ui/toast"
 import { useDialog } from "../ui/dialog"
 import { RGBA } from "@opentui/core"
 import { ACPClient } from "@/acp/client"
-import { getAllAgents, getAgent, DEFAULT_AGENT, type ACPAgentDefinition } from "@/acp/agents"
+import { getAllAgents, getAgent, getAllAgentsAsync, type ACPAgentDefinition } from "@/acp/agents"
 import type { SessionModeId, SessionModeState, SessionModelState, AuthMethod } from "@agentclientprotocol/sdk"
 import { useKV } from "./kv"
 import { ACPAuthManager } from "@/acp/auth"
@@ -87,7 +84,25 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     })
 
     const agent = iife(() => {
-      const agents = createMemo(() => getAllAgents())
+      // Track agents with reactive signal that updates after async load
+      const [agentList, setAgentList] = createSignal<ACPAgentDefinition[]>(getAllAgents())
+      const [agentsLoaded, setAgentsLoaded] = createSignal(false)
+
+      // Load agents asynchronously on mount
+      onMount(async () => {
+        try {
+          const agents = await getAllAgentsAsync()
+          setAgentList(agents)
+          setAgentsLoaded(true)
+        } catch (error) {
+          log.error("Failed to load agents from registry", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+          // Keep using cached/empty list
+          setAgentsLoaded(true)
+        }
+      })
+
       const [agentStore, setAgentStore] = createStore<{
         current: string | null
       }>({
@@ -107,11 +122,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
       return {
         list() {
-          return agents()
+          return agentList()
+        },
+        loaded() {
+          return agentsLoaded()
         },
         current() {
           if (!agentStore.current) return null
-          return agents().find((x) => x.name === agentStore.current) ?? null
+          return agentList().find((x) => x.name === agentStore.current) ?? null
         },
         async set(agentName: string, dialog?: ReturnType<typeof useDialog>) {
           setSessionStore({
@@ -267,11 +285,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         },
         move(direction: 1 | -1) {
           batch(() => {
-            let next = agents().findIndex((x) => x.name === agentStore.current) + direction
-            if (next < 0) next = agents().length - 1
-            if (next >= agents().length) next = 0
-            const value = agents()[next]
-            setAgentStore("current", value.name)
+            const agents = agentList()
+            let next = agents.findIndex((x) => x.name === agentStore.current) + direction
+            if (next < 0) next = agents.length - 1
+            if (next >= agents.length) next = 0
+            const value = agents[next]
+            if (value) {
+              setAgentStore("current", value.name)
+            }
           })
         },
         color(agentName: string | null) {
@@ -282,7 +303,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           if (agentDef?.color) {
             return RGBA.fromHex(agentDef.color)
           }
-          const index = agents().findIndex((x) => x.name === agentName)
+          const agents = agentList()
+          const index = agents.findIndex((x) => x.name === agentName)
           if (index === -1) {
             return colors()[0]
           }

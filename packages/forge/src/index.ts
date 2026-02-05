@@ -105,6 +105,10 @@ const cli = yargs(hideBin(process.argv))
   })
   .usage("\n" + UI.logo())
   .command(ListCommand)
+.command(ServeCommand)
+  // IMPORTANT: AgentRunCommand uses a catch-all pattern `<agent> [prompt..]`
+  // that will swallow any command registered after it as an agent name.
+  // Register specific commands BEFORE this one.
   .command(AgentRunCommand)
 
 cli
@@ -145,7 +149,6 @@ cli
   .command(DebugCommand)
   .command(GenerateCommand)
   .command(McpCommand)
-  .command(ServeCommand)
   .command(TuiSpawnCommand)
   .command(StatsCommand)
   .command(WebCommand)
@@ -188,12 +191,6 @@ cli
       }
       console.log(renderTopLevelHelp())
       process.exit(0)
-    }
-
-    // If no command was specified (bare `forge`), run default TUI
-    if (msg && (msg.includes("Not enough non-option arguments") || msg.includes("Missing required argument"))) {
-      await runDefaultTui(parsedArgs)
-      return
     }
 
     if (

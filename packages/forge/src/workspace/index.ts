@@ -8,9 +8,26 @@ import { Log } from "../util/log"
 import { fn } from "../util/fn"
 import { Names } from "./names"
 import { Session } from "../session"
+import { Bus } from "../bus"
 
 export namespace Workspace {
   const log = Log.create({ service: "workspace" })
+
+  export const Event = {
+    Created: Bus.event(
+      "workspace.created",
+      z.object({
+        info: z.lazy(() => Info),
+      }),
+    ),
+    Deleted: Bus.event(
+      "workspace.deleted",
+      z.object({
+        id: z.string(),
+        repoID: z.string(),
+      }),
+    ),
+  }
 
   export const Info = z
     .object({
@@ -72,6 +89,8 @@ export namespace Workspace {
 
     log.info("created workspace", { workspace })
     await Storage.write(["workspace", repoID, workspace.id], workspace)
+
+    Bus.publish(Event.Created, { info: workspace })
 
     return workspace
   })
@@ -199,6 +218,8 @@ export namespace Workspace {
 
     // Remove from storage first - this ensures cleanup even if git operations fail
     await Storage.remove(["workspace", workspace.repoID, workspace.id])
+
+    Bus.publish(Event.Deleted, { id: workspace.id, repoID: workspace.repoID })
 
     // Remove the git worktree and branch (may fail if repo is already gone)
     try {

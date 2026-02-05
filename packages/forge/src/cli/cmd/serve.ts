@@ -8,7 +8,6 @@ export const ServeCommand = cmd({
   builder: (yargs) =>
     yargs
       .option("port", {
-        alias: ["p"],
         type: "number",
         describe: "port to listen on",
         default: 0,

@@ -45,6 +45,7 @@ import { SessionStatus } from "@/session/status"
 import { ShareNext } from "@/share/share-next"
 import { ACPOrchestrator } from "../acp/orchestrator"
 import { Workspace } from "../workspace"
+import { Names } from "../workspace/names"
 import { Git } from "../git"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -2087,6 +2088,57 @@ export namespace Server {
           const { repoID } = c.req.valid("query")
           const workspaces = await Workspace.list(repoID)
           return c.json(workspaces)
+        },
+      )
+      .get(
+        "/workspace/suggest-name",
+        describeRoute({
+          description: "Suggest a random workspace name",
+          operationId: "workspace.suggestName",
+          responses: {
+            200: {
+              description: "Suggested workspace name",
+              content: {
+                "application/json": {
+                  schema: resolver(z.object({ name: z.string() })),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const name = await Names.generateRandomName()
+          return c.json({ name })
+        },
+      )
+      .post(
+        "/workspace",
+        describeRoute({
+          description: "Create a new workspace",
+          operationId: "workspace.create",
+          responses: {
+            200: {
+              description: "Successfully created workspace",
+              content: {
+                "application/json": {
+                  schema: resolver(Workspace.Info),
+                },
+              },
+            },
+            ...errors(400),
+          },
+        }),
+        validator(
+          "json",
+          z.object({
+            name: z.string().optional(),
+            repoRoot: z.string(),
+          }),
+        ),
+        async (c) => {
+          const body = c.req.valid("json")
+          const workspace = await Workspace.create(body)
+          return c.json(workspace)
         },
       )
       .get(

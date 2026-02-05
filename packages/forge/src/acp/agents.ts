@@ -1,6 +1,15 @@
 import type { MatchResult } from "../util/match.js"
 import { fuzzyMatch } from "../util/match.js"
-import { AGENT_DEFINITIONS } from "./agent-definitions.js"
+import {
+  getAgents as fetchAgents,
+  getAgent as fetchAgent,
+  getCommand,
+  getArgs,
+  getEnv,
+  getInstallCommand,
+  clearCache,
+  type Agent,
+} from "./registry/index.js"
 
 export interface InstallCommand {
   method: string // e.g., "npm", "brew", "curl", "cargo", "uv"
@@ -8,6 +17,11 @@ export interface InstallCommand {
   description?: string
 }
 
+/**
+ * Agent definition interface for backward compatibility
+ *
+ * Maps registry Agent type to the interface expected by consumers
+ */
 export interface ACPAgentDefinition {
   name: string
   description: string
@@ -28,36 +42,192 @@ export interface ACPAgentDefinition {
   installCheck?: string
   // Alias for acpStartupArgs for backward compatibility
   args?: string[]
+  // Environment variables for subprocess
+  env?: Record<string, string>
+  // Original registry agent data
+  _registryAgent?: Agent
 }
 
 /**
- * All available ACP agents, with priority agents first (Claude, Codex, Gemini),
- * followed by the rest alphabetically.
- * Agent definitions are imported from agent-definitions.ts.
+ * Cache for agents converted to ACPAgentDefinition
  */
-const PRIORITY_ORDER = ["Claude Code ACP", "Codex ACP", "Gemini CLI"]
+let agentCache: ACPAgentDefinition[] | null = null
 
-export const ACP_AGENTS: ACPAgentDefinition[] = [...AGENT_DEFINITIONS].sort((a, b) => {
-  const aIndex = PRIORITY_ORDER.indexOf(a.name)
-  const bIndex = PRIORITY_ORDER.indexOf(b.name)
+/**
+ * Convert a registry Agent to ACPAgentDefinition format
+ */
+function toDefinition(agent: Agent): ACPAgentDefinition {
+  const command = getCommand(agent)
+  const args = getArgs(agent)
+  const env = getEnv(agent)
+  const installCmd = getInstallCommand(agent)
 
-  // If both are priority agents, sort by their priority order
-  if (aIndex !== -1 && bIndex !== -1) {
-    return aIndex - bIndex
+  // Determine install method
+  let installMethod: "npx" | "uvx" | "system" | "skip" = "system"
+  if (agent.distribution.npx) {
+    installMethod = "npx"
+  } else if (agent.distribution.uvx) {
+    installMethod = "uvx"
   }
 
-  // If only a is a priority agent, it comes first
-  if (aIndex !== -1) return -1
+  // Build install commands
+  const unixInstall: InstallCommand[] = []
+  const windowsInstall: InstallCommand[] = []
 
-  // If only b is a priority agent, it comes first
-  if (bIndex !== -1) return 1
+  if (agent.distribution.npx) {
+    const npmCmd = {
+      method: "npm",
+      command: `npm install -g ${agent.distribution.npx.package}`,
+      description: "Install via npm (global)",
+    }
+    unixInstall.push(npmCmd)
+    windowsInstall.push(npmCmd)
+  }
 
-  // Neither are priority agents, sort alphabetically
-  return a.name.localeCompare(b.name)
-})
+  if (agent.distribution.uvx) {
+    const uvCmd = {
+      method: "uv",
+      command: `uv tool install ${agent.distribution.uvx.package}`,
+      description: "Install via uv tool",
+    }
+    unixInstall.push(uvCmd)
+    windowsInstall.push(uvCmd)
+  }
 
+  if (agent.distribution.binary) {
+    // For binary distribution, add a generic install note
+    if (agent.repository) {
+      const binaryCmd = {
+        method: "binary",
+        command: `# Download from ${agent.repository}`,
+        description: "Download pre-built binary",
+      }
+      unixInstall.push(binaryCmd)
+      windowsInstall.push(binaryCmd)
+    }
+  }
+
+  // Build uninstall commands
+  const unixUninstall: InstallCommand[] = []
+  const windowsUninstall: InstallCommand[] = []
+
+  if (agent.distribution.npx) {
+    // Extract package name without version
+    const pkg = agent.distribution.npx.package.split("@").slice(0, -1).join("@") ||
+                agent.distribution.npx.package
+    const npmCmd = {
+      method: "npm",
+      command: `npm uninstall -g ${pkg}`,
+      description: "Uninstall via npm (global)",
+    }
+    unixUninstall.push(npmCmd)
+    windowsUninstall.push(npmCmd)
+  }
+
+  if (agent.distribution.uvx) {
+    const uvCmd = {
+      method: "uv",
+      command: `uv tool uninstall ${agent.distribution.uvx.package.split("@")[0]}`,
+      description: "Uninstall via uv tool",
+    }
+    unixUninstall.push(uvCmd)
+    windowsUninstall.push(uvCmd)
+  }
+
+  return {
+    name: agent.name,
+    description: agent.description,
+    command,
+    acpStartupArgs: args,
+    args,
+    env: Object.keys(env).length > 0 ? env : undefined,
+    installCommands: {
+      unix: unixInstall,
+      windows: windowsInstall,
+    },
+    uninstallCommands:
+      unixUninstall.length > 0 || windowsUninstall.length > 0
+        ? { unix: unixUninstall, windows: windowsUninstall }
+        : undefined,
+    installGuide: agent.repository,
+    color: agent.color,
+    installMethod,
+    _registryAgent: agent,
+  }
+}
+
+/**
+ * Get all agents from the registry
+ *
+ * This is async because it may need to fetch from the CDN.
+ * Results are cached in memory after first fetch.
+ */
+export async function getAllAgentsAsync(): Promise<ACPAgentDefinition[]> {
+  if (agentCache) {
+    return agentCache
+  }
+
+  const agents = await fetchAgents()
+  agentCache = agents.map(toDefinition)
+  return agentCache
+}
+
+/**
+ * Get all agents synchronously (uses cached data)
+ *
+ * Returns empty array if cache hasn't been populated yet.
+ * Prefer using getAllAgentsAsync() for initial load.
+ */
+export function getAllAgents(): ACPAgentDefinition[] {
+  return agentCache ?? []
+}
+
+/**
+ * Preload agents into cache
+ *
+ * Call this during app initialization to ensure agents are available.
+ */
+export async function preloadAgents(): Promise<void> {
+  await getAllAgentsAsync()
+}
+
+/**
+ * Get a single agent by name
+ */
+export async function getAgentAsync(name: string): Promise<ACPAgentDefinition | undefined> {
+  const agents = await getAllAgentsAsync()
+  const normalizedName = name.toLowerCase()
+  return agents.find(
+    (a) => a.name.toLowerCase() === normalizedName ||
+           a._registryAgent?.id.toLowerCase() === normalizedName,
+  )
+}
+
+/**
+ * Get a single agent by name (synchronous, uses cache)
+ */
 export function getAgent(name: string): ACPAgentDefinition | undefined {
-  return ACP_AGENTS.find((agent) => agent.name === name)
+  const agents = getAllAgents()
+  const normalizedName = name.toLowerCase()
+  return agents.find(
+    (a) => a.name.toLowerCase() === normalizedName ||
+           a._registryAgent?.id.toLowerCase() === normalizedName,
+  )
+}
+
+/**
+ * Match an agent by fuzzy name matching
+ */
+export function matchAgent(name: string): MatchResult<ACPAgentDefinition> {
+  return fuzzyMatch(name, getAllAgents(), (agent) => agent.name)
+}
+
+/**
+ * Match an agent by fuzzy name matching (async version)
+ */
+export async function matchAgentAsync(name: string): Promise<MatchResult<ACPAgentDefinition>> {
+  const agents = await getAllAgentsAsync()
+  return fuzzyMatch(name, agents, (agent) => agent.name)
 }
 
 export function getInstallCommandsForPlatform(
@@ -75,14 +245,17 @@ export function getUninstallCommandsForPlatform(
   return platform === "win32" ? agent.uninstallCommands.windows : agent.uninstallCommands.unix
 }
 
-export function matchAgent(name: string): MatchResult<ACPAgentDefinition> {
-  return fuzzyMatch(name, ACP_AGENTS, (agent) => agent.name)
-}
-
-export function getAllAgents(): ACPAgentDefinition[] {
-  return ACP_AGENTS
+/**
+ * Clear the agent cache (forces refresh on next call)
+ */
+export async function clearAgentCache(): Promise<void> {
+  agentCache = null
+  await clearCache()
 }
 
 // No default agent - user must select on first launch
 // After selection, their choice is stored in KV as the default for future sessions
 export const DEFAULT_AGENT: ACPAgentDefinition | null = null
+
+// Re-export types
+export type { Agent as RegistryAgent } from "./registry/index.js"

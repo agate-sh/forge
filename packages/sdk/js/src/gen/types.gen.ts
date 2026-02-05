@@ -642,6 +642,34 @@ export type EventFileWatcherUpdated = {
   }
 }
 
+export type Workspace = {
+  id: string
+  name: string
+  branch: string
+  repoID: string
+  repoRoot: string
+  worktreePath: string
+  time: {
+    created: number
+    accessed: number
+  }
+}
+
+export type EventWorkspaceCreated = {
+  type: "workspace.created"
+  properties: {
+    info: Workspace
+  }
+}
+
+export type EventWorkspaceDeleted = {
+  type: "workspace.deleted"
+  properties: {
+    id: string
+    repoID: string
+  }
+}
+
 export type EventServerConnected = {
   type: "server.connected"
   properties: {
@@ -675,6 +703,8 @@ export type Event =
   | EventPlanUpdated
   | EventSessionModeChanged
   | EventFileWatcherUpdated
+  | EventWorkspaceCreated
+  | EventWorkspaceDeleted
   | EventServerConnected
 
 export type GlobalEvent = {
@@ -1451,19 +1481,6 @@ export type FormatterStatus = {
   name: string
   extensions: Array<string>
   enabled: boolean
-}
-
-export type Workspace = {
-  id: string
-  name: string
-  branch: string
-  repoID: string
-  repoRoot: string
-  worktreePath: string
-  time: {
-    created: number
-    accessed: number
-  }
 }
 
 export type OAuth = {
@@ -3328,6 +3345,56 @@ export type WorkspaceListResponses = {
 }
 
 export type WorkspaceListResponse = WorkspaceListResponses[keyof WorkspaceListResponses]
+
+export type WorkspaceCreateData = {
+  body?: {
+    name?: string
+    repoRoot: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/workspace"
+}
+
+export type WorkspaceCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type WorkspaceCreateError = WorkspaceCreateErrors[keyof WorkspaceCreateErrors]
+
+export type WorkspaceCreateResponses = {
+  /**
+   * Successfully created workspace
+   */
+  200: Workspace
+}
+
+export type WorkspaceCreateResponse = WorkspaceCreateResponses[keyof WorkspaceCreateResponses]
+
+export type WorkspaceSuggestNameData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/workspace/suggest-name"
+}
+
+export type WorkspaceSuggestNameResponses = {
+  /**
+   * Suggested workspace name
+   */
+  200: {
+    name: string
+  }
+}
+
+export type WorkspaceSuggestNameResponse = WorkspaceSuggestNameResponses[keyof WorkspaceSuggestNameResponses]
 
 export type WorkspaceGetData = {
   body?: never

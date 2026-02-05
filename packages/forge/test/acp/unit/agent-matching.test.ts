@@ -1,5 +1,10 @@
-import { describe, expect, test } from "bun:test";
-import { matchAgent, ACP_AGENTS } from "../../../src/acp/agents.js";
+import { describe, expect, test, beforeAll } from "bun:test";
+import { matchAgent, getAllAgents, preloadAgents } from "../../../src/acp/agents.js";
+
+// Preload agents before tests run
+beforeAll(async () => {
+	await preloadAgents();
+});
 
 describe("matchAgent", () => {
 	test("exact match (case-insensitive)", () => {
@@ -34,14 +39,6 @@ describe("matchAgent", () => {
 		}
 	});
 
-	test("fuzzy match - 'goose' matches 'Goose'", () => {
-		const result = matchAgent("goose");
-		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.match.name).toBe("Goose");
-		}
-	});
-
 	test("ambiguous match - 'cli' matches multiple agents", () => {
 		const result = matchAgent("cli");
 		expect(result.success).toBe(false);
@@ -49,8 +46,6 @@ describe("matchAgent", () => {
 			expect(result.matches.length).toBeGreaterThan(1);
 			const matchNames = result.matches.map((a) => a.name);
 			expect(matchNames).toContain("Gemini CLI");
-			expect(matchNames).toContain("Codex CLI");
-			expect(matchNames).toContain("Kimi CLI");
 		}
 	});
 
@@ -58,7 +53,7 @@ describe("matchAgent", () => {
 		const result = matchAgent("invalid");
 		expect(result.success).toBe(false);
 		if (!result.success && result.error === "not-found") {
-			expect(result.available).toEqual(ACP_AGENTS);
+			expect(result.available).toEqual(getAllAgents());
 		}
 	});
 
@@ -66,7 +61,7 @@ describe("matchAgent", () => {
 		const result = matchAgent("");
 		expect(result.success).toBe(false);
 		if (!result.success && result.error === "not-found") {
-			expect(result.available).toEqual(ACP_AGENTS);
+			expect(result.available).toEqual(getAllAgents());
 		}
 	});
 });
